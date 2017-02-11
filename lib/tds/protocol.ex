@@ -99,16 +99,25 @@ defmodule Tds.Protocol do
   ## executing
 
   def message(:executing, msg_sql_result(columns: columns, rows: rows, done: done), %{} = s) do
-    if columns != nil do
-      columns = Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
-    end
+    columns =
+      if columns != nil do
+        Enum.reduce(columns, [], fn (col, acc) -> [col[:name]|acc] end) |> Enum.reverse
+      else
+        columns
+      end
     num_rows = done.rows;
-    if rows != nil do
-      rows = Enum.reverse rows
-    end
-    if num_rows == 0 && rows == nil do
-      rows = []
-    end
+    rows =
+      if rows != nil do
+        Enum.reverse rows
+      else
+        rows
+      end
+    rows =
+      if num_rows == 0 && rows == nil do
+        []
+      else
+        rows
+      end
     result = %Tds.Result{columns: columns, rows: rows, num_rows: num_rows}
     reply(result, s)
     ready(s)

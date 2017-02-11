@@ -117,7 +117,13 @@ defmodule Tds.Connection do
     host      = Keyword.fetch!(opts, :hostname)
     host      = if is_binary(host), do: String.to_char_list(host), else: host
     port      = s[:itcp] || opts[:port] || System.get_env("MSSQLPORT") || 1433
-    if is_binary(port), do: {port, _} = Integer.parse(port)
+    port =
+      if is_binary(port) do
+        {port, _} = Integer.parse(port)
+        port
+      else
+        port
+      end
     timeout   = opts[:timeout] || @timeout
     sock_opts = [{:active, :once}, :binary, {:packet, :raw}, {:delay_send, false}] ++ (opts[:socket_options] || [])
 
@@ -171,17 +177,19 @@ defmodule Tds.Connection do
   end
 
   def handle_info({:DOWN, ref, :process, _, _}, s) do
-    case :queue.out(s.queue) do
-      {{:value, {_,_,^ref}}, _queue} ->
-        {_, s} = command(:attn, s)
-      {:empty, _} -> nil
-      {_, _queue} ->
-        queue = s.queue
-          |> :queue.to_list
-          |> Enum.reject(fn({_, _, r}) -> r == ref end)
-          |> :queue.from_list
-        s = %{s | queue: queue}
-    end
+    s =
+      case :queue.out(s.queue) do
+        {{:value, {_,_,^ref}}, _queue} ->
+          {_, s} = command(:attn, s)
+          s
+        {:empty, _} -> s
+        {_, _queue} ->
+          queue = s.queue
+            |> :queue.to_list
+            |> Enum.reject(fn({_, _, r}) -> r == ref end)
+            |> :queue.from_list
+          %{s | queue: queue}
+      end
     {:noreply, s}
   end
 
